@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>先生の放課後スケジュール・行事管理</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script>
+    // Tailwind CSSのカスタム設定（フォントファミリーの拡張）
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* 全体の基本スタイリング（ダークテーマ） */
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: #0b1220;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(34,211,238,0.08), transparent),
+        repeating-linear-gradient(0deg, rgba(56,189,248,0.03) 0px, rgba(56,189,248,0.03) 1px, transparent 1px, transparent 32px),
+        repeating-linear-gradient(90deg, rgba(56,189,248,0.03) 0px, rgba(56,189,248,0.03) 1px, transparent 1px, transparent 32px);
+      background-attachment: fixed;
+    }
+
+    /* 種別ごとのカード左枠線カラー定義 */
+    .type-card-会議 { border-left-color: #ef4444; }
+    .type-card-行事 { border-left-color: #f59e0b; }
+    .type-card-部活 { border-left-color: #10b981; }
+    .type-card-その他 { border-left-color: #64748b; }
+
+    /* 終了した予定のカードスタイル（透過表示） */
+    .past-task {
+      opacity: 0.6;
+      background-color: #17223a !important;
+    }
+
+    /* サーキット基板風ヘッダーの背景パターン */
+    .tech-header {
+      background-color: #050810;
+      background-image:
+        linear-gradient(120deg, rgba(34,211,238,0.10) 0%, transparent 45%),
+        repeating-linear-gradient(0deg, rgba(56,189,248,0.07) 0px, rgba(56,189,248,0.07) 1px, transparent 1px, transparent 26px),
+        repeating-linear-gradient(90deg, rgba(56,189,248,0.07) 0px, rgba(56,189,248,0.07) 1px, transparent 1px, transparent 26px);
+      position: relative;
+    }
+    .tech-header::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #22d3ee 50%, transparent);
+      opacity: 0.7;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1220;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 antialiased p-3 sm:p-6 md:p-8 flex justify-center items-start">
+
+  <div class="w-full max-w-4xl bg-[#131c30] rounded-2xl shadow-2xl shadow-cyan-500/5 border border-cyan-500/15 overflow-hidden my-auto">
+    
+    <!-- トップヘッダーバナー（電子基板風デザイン） -->
+    <header class="tech-header text-white p-5 sm:p-7 relative overflow-hidden">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-cyan-400/10 border border-cyan-400/30 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold tracking-wide text-cyan-300 mb-2">
+            <i class="fa-solid fa-bolt text-cyan-300"></i> 校内情報共有ダッシュボード
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white" style="text-shadow: 0 0 20px rgba(34,211,238,0.4);">放課後スケジュール・行事管理</h1>
+          <p class="text-cyan-100/60 text-[11px] sm:text-xs mt-1.5 tracking-[0.15em] uppercase">Schedule &amp; Event Management</p>
+        </div>
+        
+        <!-- リアルタイム集計カウンター -->
+        <div class="flex items-center gap-2 self-start sm:self-center">
+          <div class="bg-white/5 backdrop-blur-sm border border-cyan-400/20 px-3.5 py-2 rounded-xl text-center min-w-[75px]">
+            <span class="block text-[11px] text-cyan-100/50 font-medium">全予定</span>
+            <span id="statTotalCount" class="text-xl font-bold text-white">0</span>
+          </div>
+          <div class="bg-white/5 backdrop-blur-sm border border-cyan-400/20 px-3.5 py-2 rounded-xl text-center min-w-[75px]">
+            <span class="block text-[11px] text-cyan-100/50 font-medium">本日の予定</span>
+            <span id="statTodayCount" class="text-xl font-bold text-amber-300">0</span>
+          </div>
+          <div class="bg-white/5 backdrop-blur-sm border border-cyan-400/20 px-3.5 py-2 rounded-xl text-center min-w-[75px]">
+            <span class="block text-[11px] text-cyan-100/50 font-medium">終了した予定</span>
+            <span id="statPastCount" class="text-xl font-bold text-slate-400">0</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="p-4 sm:p-6 md:p-8 space-y-6">
+
+      <!-- スケジュール登録フォーム -->
+      <section class="bg-slate-700/40 border border-cyan-500/15 rounded-2xl p-4 sm:p-6 shadow-sm relative">
+        <h2 class="text-base font-bold text-slate-100 flex items-center gap-2 mb-4">
+          <span class="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-sm">
+            <i id="formTitleIcon" class="fa-solid fa-calendar-plus"></i>
+          </span>
+          <span id="formTitleText">新しいスケジュールを追加</span>
+        </h2>
+
+        <form id="scheduleForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+          <!-- 行 1: 担当者 & 種別 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="teacherSelect" class="block text-xs font-semibold text-slate-400 mb-1">
+                担当（先生の名前） <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <select id="teacherSelect" required class="w-full bg-slate-900/70 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 appearance-none transition-all">
+                  <option value="">名前を選択...</option>
+                  <option value="小松先生">小松先生</option>
+                  <option value="中塚先生">中塚先生</option>
+                  <option value="塩沢誉先生">塩沢誉先生</option>
+                  <option value="塩澤仁志先生">塩澤仁志先生</option>
+                  <option value="福澤先生">福澤先生</option>
+                  <option value="丸山先生">丸山先生</option>
+                  <option value="清水先生">清水先生</option>
+                </select>
+                <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
+              </div>
+            </div>
+
+            <div>
+              <label for="typeSelect" class="block text-xs font-semibold text-slate-400 mb-1">
+                種別 <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <select id="typeSelect" required class="w-full bg-slate-900/70 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 appearance-none transition-all">
+                  <option value="会議">会議</option>
+                  <option value="行事">行事</option>
+                  <option value="部活">部活</option>
+                  <option value="その他">その他</option>
+                </select>
+                <i class="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- 行 2: 日付 & 時間 -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label for="dateInput" class="block text-xs font-semibold text-slate-400 mb-1">
+                日付 <span class="text-red-500">*</span>
+              </label>
+              <input type="date" id="dateInput" required class="w-full bg-slate-900/70 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all">
+            </div>
+
+            <div>
+              <label for="timeInput" class="block text-xs font-semibold text-slate-400 mb-1">
+                開始時間 <span class="text-slate-400 font-normal">(任意)</span>
+              </label>
+              <input type="time" id="timeInput" class="w-full bg-slate-900/70 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all">
+            </div>
+
+            <div>
+              <label for="endTimeInput" class="block text-xs font-semibold text-slate-400 mb-1">
+                終了時間 <span class="text-slate-400 font-normal">(任意)</span>
+              </label>
+              <input type="time" id="endTimeInput" class="w-full bg-slate-900/70 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all">
+            </div>
+          </div>
+
+          <!-- 行 3: 予定・内容 -->
+          <div>
+            <label for="taskInput" class="block text-xs font-semibold text-slate-400 mb-1">
+              予定・内容 <span class="text-red-500">*</span>
+            </label>
+            <textarea id="taskInput" required rows="3" placeholder="例：学年会議、保護者会準備、サッカー部練習指導 など&#10;（Enterキーで改行できます）" class="w-full bg-slate-900/70 border border-slate-700 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all resize-y"></textarea>
+          </div>
+
+          <!-- 送信ボタン & 編集キャンセルボタン -->
+          <div class="flex gap-3">
+            <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-cyan-900/30 hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
+              <i id="submitBtnIcon" class="fa-solid fa-plus"></i> <span id="submitBtnText">スケジュールを追加</span>
+            </button>
+            <button type="button" id="cancelEditBtn" onclick="cancelEdit()" class="hidden px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl border border-slate-700 transition-all">
+              キャンセル
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 担当者フィルタータブ -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-user-gear text-cyan-400"></i> 担当の先生で絞り込み（複数選択可）
+          </h2>
+          <span id="currentTeacherLabel" class="text-xs font-semibold text-cyan-400">表示中: 全員</span>
+        </div>
+
+        <!-- 横スクロール可能な先生選択タブ -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 pt-1 no-scrollbar -mx-1 px-1">
+          <button type="button" onclick="toggleTeacherTab('ALL')" id="tab-ALL" class="teacher-tab px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-sm bg-cyan-600 text-white ring-2 ring-cyan-400/60">
+            👥 全員
+          </button>
+          <button type="button" onclick="toggleTeacherTab('小松先生')" id="tab-小松先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            小松先生
+          </button>
+          <button type="button" onclick="toggleTeacherTab('中塚先生')" id="tab-中塚先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            中塚先生
+          </button>
+          <button type="button" onclick="toggleTeacherTab('塩沢誉先生')" id="tab-塩沢誉先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            塩沢誉先生
+          </button>
+          <button type="button" onclick="toggleTeacherTab('塩澤仁志先生')" id="tab-塩澤仁志先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            塩澤仁志先生
+          </button>
+          <button type="button" onclick="toggleTeacherTab('福澤先生')" id="tab-福澤先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            福澤先生
+          </button>
+          <button type="button" onclick="toggleTeacherTab('丸山先生')" id="tab-丸山先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            丸山先生
+          </button>
+          <button type="button" onclick="toggleTeacherTab('清水先生')" id="tab-清水先生" class="teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all">
+            清水先生
+          </button>
+        </div>
+      </section>
+
+      <!-- カテゴリフィルター & アクションコントロール -->
+      <section class="flex flex-wrap items-center justify-between gap-3 bg-slate-700/40 p-3 rounded-xl border border-slate-600/50">
+        <!-- 種別フィルター -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-slate-400 whitespace-nowrap">種別:</span>
+          <div class="relative">
+            <select id="filterType" onchange="renderSchedule()" class="bg-slate-900/70 border border-slate-700 text-slate-200 text-xs rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 appearance-none">
+              <option value="ALL">すべての種別</option>
+              <option value="会議">会議</option>
+              <option value="行事">行事</option>
+              <option value="部活">部活</option>
+              <option value="その他">その他</option>
+            </select>
+            <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none text-[10px]"></i>
+          </div>
+        </div>
+
+        <!-- 過去予定の一括削除ボタン -->
+        <button onclick="requestDeletePastTasks()" class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+          <i class="fa-solid fa-broom text-rose-400"></i> 終了した予定を一括削除
+        </button>
+      </section>
+
+      <!-- 進行中・本日の予定一覧セクション -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between px-1">
+          <h2 class="text-base font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-day text-cyan-400"></i> 今後の予定・本日の予定
+          </h2>
+          <span id="upcomingCountText" class="text-xs text-slate-400">0 件</span>
+        </div>
+
+        <ul id="upcomingTaskList" class="space-y-2.5 min-h-[60px]">
+          <!-- JavaScriptによって動的に予定カードが挿入されます -->
+        </ul>
+      </section>
+
+      <!-- 終了した予定一覧セクション（アコーディオン形式） -->
+      <section class="space-y-3 pt-4 border-t border-slate-700/50">
+        <details class="group bg-slate-700/30 border border-slate-600/50 rounded-2xl p-4 transition-all" open>
+          <summary class="flex items-center justify-between font-bold text-slate-300 cursor-pointer select-none list-none">
+            <div class="flex items-center gap-2 text-sm sm:text-base">
+              <i class="fa-solid fa-circle-check text-slate-500 group-open:text-cyan-400 transition-colors"></i>
+              <span>終了した予定（期限切れ）</span>
+              <span id="pastCountText" class="text-xs bg-slate-700/60 text-slate-300 px-2 py-0.5 rounded-full ml-1">0 件</span>
+            </div>
+            <i class="fa-solid fa-chevron-down text-slate-500 text-xs group-open:rotate-180 transition-transform duration-200"></i>
+          </summary>
+
+          <ul id="pastTaskList" class="space-y-2.5 mt-4">
+            <!-- JavaScriptによって動的に終了済みの予定カードが挿入されます -->
+          </ul>
+        </details>
+      </section>
+
+    </main>
+
+    <!-- フッター -->
+    <footer class="bg-slate-900/60 border-t border-slate-700/50 px-6 py-4 text-center text-xs text-slate-500">
+      <p>先生の放課後スケジュール・行事管理システム &copy; 校内連携・校務効率化</p>
+    </footer>
+  </div>
+
+  <!-- カスタム確認ダイアログ（モーダル） -->
+  <div id="customModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200 p-4">
+    <div class="bg-[#0b1220] border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl transform scale-95 transition-transform duration-200" id="modalCard">
+      <div id="modalIconContainer" class="w-12 h-12 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto mb-4 text-xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h3 id="modalTitle" class="text-lg font-bold text-slate-100 text-center mb-1">削除の確認</h3>
+      <p id="modalMessage" class="text-sm text-slate-400 text-center mb-6">この処理を実行しますか？</p>
+      <div class="flex gap-3">
+        <button onclick="closeModal()" class="flex-1 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+          キャンセル
+        </button>
+        <button id="modalConfirmBtn" class="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-md transition-colors">
+          実行する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK の読み込み -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Firebaseの接続設定オブジェクト
+    const firebaseConfig = {
+      apiKey: "AIzaSyCn9ynoMkceF_4oucSsuyJk2MR63rXoL78",
+      authDomain: "school-schedule-8806e.firebaseapp.com",
+      databaseURL: "https://school-schedule-8806e-default-rtdb.firebaseio.com",
+      projectId: "school-schedule-8806e",
+      storageBucket: "school-schedule-8806e.firebasestorage.app",
+      messagingSenderId: "520405731274",
+      appId: "1:520405731274:web:1c7f98a459bdce3dbab133"
+    };
+
+    // グローバル変数の宣言
+    let db = null;                     // Firebase Databaseの参照
+    let tasksRef = null;               // DB内の "tasks" ノードへの参照
+    let isFirebaseConnected = false;   // Firebase接続状態のフラグ
+
+    let tasks = [];                    // 予定データを保持する配列
+    let selectedTeachers = ['ALL'];    // 選択されている先生フィルターの配列
+    let modalActionType = null;        // モーダルの実行アクション種別（'delete_single' や 'delete_past'）
+    let deleteTargetId = null;         // 個別削除対象のタスクID
+    let editingTaskId = null;          // 編集中のタスクID（null の場合は新規追加モード）
+
+    // 担当できる先生の定数リスト
+    const teacherList = ["小松先生", "中塚先生", "塩沢誉先生", "塩澤仁志先生", "福澤先生", "丸山先生", "清水先生"];
+
+    // ページ読み込み完了時の初期化処理
+    document.addEventListener("DOMContentLoaded", () => {
+      // フォームの日付入力欄に本日の日付を初期値としてセット
+      const todayStr = getTodayFormatted();
+      document.getElementById("dateInput").value = todayStr;
+
+      try {
+        // Firebaseライブラリが正常に読み込まれているかチェック
+        if (typeof firebase !== 'undefined') {
+          firebase.initializeApp(firebaseConfig);
+          db = firebase.database();
+          tasksRef = db.ref("tasks");
+          
+          // Firebaseからリアルタイムにデータを受信
+          tasksRef.on("value", (snapshot) => {
+            isFirebaseConnected = true;
+            const data = snapshot.val();
+            // データを配列形式に変換
+            tasks = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+            renderSchedule();
+          }, (error) => {
+            // エラー時（オフラインや権限エラー）はLocalStorageへ切り替え
+            console.warn("Firebase offline or permission error, falling back to LocalStorage:", error);
+            initLocalStorageFallback();
+          });
+        } else {
+          initLocalStorageFallback();
+        }
+      } catch (e) {
+        console.warn("Firebase init failed, fallback to LocalStorage:", e);
+        initLocalStorageFallback();
+      }
+    });
+
+    // Firebaseが使えない場合にローカルストレージを使用するフォールバック処理
+    function initLocalStorageFallback() {
+      isFirebaseConnected = false;
+      const cached = localStorage.getItem("teacher_schedules_v2");
+      if (cached) {
+        try {
+          tasks = JSON.parse(cached);
+        } catch(e) {
+          tasks = getSampleData();
+        }
+      } else {
+        // キャッシュがない場合はサンプルデータをセット
+        tasks = getSampleData();
+        saveTasksToStorage();
+      }
+      renderSchedule();
+    }
+
+    // ローカルストレージに現在の予定リストを保存する関数
+    function saveTasksToStorage() {
+      if (!isFirebaseConnected) {
+        localStorage.setItem("teacher_schedules_v2", JSON.stringify(tasks));
+      }
+    }
+
+    // 今日の日付を "YYYY-MM-DD" フォーマットの文字列で取得する関数
+    function getTodayFormatted() {
+      const today = new Date();
+      return today.toISOString().split('T')[0];
+    }
+
+    // 初回起動時用のサンプルデータを生成する関数
+    function getSampleData() {
+      const todayStr = getTodayFormatted();
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+      return [
+        {
+          id: "task_sample_1",
+          teacher: "小松先生",
+          type: "会議",
+          date: yesterdayStr,
+          time: "15:30",
+          endTime: "16:30",
+          text: "第2回 校内研修準備会"
+        },
+        {
+          id: "task_sample_2",
+          teacher: "塩沢誉先生",
+          type: "部活",
+          date: todayStr,
+          time: "16:00",
+          endTime: "18:00",
+          text: "サッカー部 グラウンド技術指導"
+        },
+        {
+          id: "task_sample_3",
+          teacher: "中塚先生",
+          type: "行事",
+          date: tomorrowStr,
+          time: "10:00",
+          endTime: "12:00",
+          text: "生徒会選挙 リハーサル進行"
+        }
+      ];
+    }
+
+    // 先生フィルタータブの切替処理（複数選択対応）
+    function toggleTeacherTab(teacherName) {
+      if (teacherName === 'ALL') {
+        selectedTeachers = ['ALL'];
+      } else {
+        // 'ALL'が選択されている状態で個別の先生が押されたら'ALL'を解除
+        if (selectedTeachers.includes('ALL')) selectedTeachers = [];
+
+        if (selectedTeachers.includes(teacherName)) {
+          // すでに選択されている場合は解除
+          selectedTeachers = selectedTeachers.filter(t => t !== teacherName);
+        } else {
+          // 選択されていない場合は追加
+          selectedTeachers.push(teacherName);
+        }
+
+        // 誰も選択されていない、または全員選択された場合は 'ALL' 状態に戻す
+        if (selectedTeachers.length === 0 || selectedTeachers.length === teacherList.length) {
+          selectedTeachers = ['ALL'];
+        }
+      }
+
+      updateTeacherTabUI();
+      renderSchedule();
+    }
+
+    // 先生フィルタータブの見た目（アクティブ状態）を更新する関数
+    function updateTeacherTabUI() {
+      const activeClass = "teacher-tab px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all shadow-sm bg-cyan-600 text-white ring-2 ring-cyan-400/60";
+      const inactiveClass = "teacher-tab px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-slate-800/60 text-slate-300 border border-slate-700 hover:bg-slate-700/60 transition-all";
+
+      // 「全員」ボタンのスタイル更新
+      document.getElementById('tab-ALL').className = selectedTeachers.includes('ALL') ? activeClass : inactiveClass;
+
+      // 各先生ボタンのスタイル更新
+      teacherList.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (btn) {
+          btn.className = selectedTeachers.includes(t) && !selectedTeachers.includes('ALL') ? activeClass : inactiveClass;
+        }
+      });
+
+      // 現在表示中のラベル文言を更新
+      const label = document.getElementById("currentTeacherLabel");
+      label.textContent = selectedTeachers.includes('ALL') ? "表示中: 全員" : `表示中: ${selectedTeachers.join('・')}`;
+    }
+
+    // フォーム送信（新規スケジュール追加 or 既存スケジュール編集）時の処理
+    function handleFormSubmit(event) {
+      event.preventDefault(); // ページの再読み込みを防止
+
+      // 入力値の取得
+      const teacher = document.getElementById("teacherSelect").value;
+      const type = document.getElementById("typeSelect").value;
+      const date = document.getElementById("dateInput").value;
+      const time = document.getElementById("timeInput").value;
+      const endTime = document.getElementById("endTimeInput").value;
+      const text = document.getElementById("taskInput").value.trim();
+
+      // 必須項目チェック
+      if (!teacher || !date || !text) return;
+
+      const taskData = { teacher, type, date, time, endTime, text };
+
+      // 編集モードの場合：既存タスクを更新する
+      if (editingTaskId) {
+        if (isFirebaseConnected && db) {
+          db.ref("tasks/" + editingTaskId).update(taskData);
+        } else {
+          const idx = tasks.findIndex(t => t.id === editingTaskId);
+          if (idx !== -1) {
+            tasks[idx] = { ...tasks[idx], ...taskData };
+          }
+          saveTasksToStorage();
+          renderSchedule();
+        }
+        cancelEdit(); // フォームを新規追加モードに戻す
+        return;
+      }
+
+      // 新規追加モードの場合
+      const newTask = taskData;
+
+      if (isFirebaseConnected && tasksRef) {
+        // Firebaseへ追加
+        tasksRef.push(newTask);
+      } else {
+        // ローカルストレージへ追加
+        newTask.id = "task_" + Date.now();
+        tasks.push(newTask);
+        saveTasksToStorage();
+        renderSchedule();
+      }
+
+      // 入力フィールドのリセット
+      document.getElementById("taskInput").value = "";
+      document.getElementById("timeInput").value = "";
+      document.getElementById("endTimeInput").value = "";
+    }
+
+    // 予定の編集を開始する処理（フォームに既存データを読み込み編集モードへ切替）
+    function startEditTask(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      editingTaskId = id;
+
+      // 既存の値をフォームへ反映
+      document.getElementById("teacherSelect").value = task.teacher;
+      document.getElementById("typeSelect").value = task.type;
+      document.getElementById("dateInput").value = task.date;
+      document.getElementById("timeInput").value = task.time || "";
+      document.getElementById("endTimeInput").value = task.endTime || "";
+      document.getElementById("taskInput").value = (task.text || "").trim();
+
+      // フォームの見た目を「編集モード」に切替
+      document.getElementById("formTitleText").textContent = "予定を編集";
+      document.getElementById("formTitleIcon").className = "fa-solid fa-pen";
+      document.getElementById("submitBtnIcon").className = "fa-solid fa-check";
+      document.getElementById("submitBtnText").textContent = "変更を保存";
+      document.getElementById("cancelEditBtn").classList.remove("hidden");
+
+      // フォームの位置までスムーズにスクロール
+      document.getElementById("scheduleForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    // 編集モードをキャンセルし、新規追加モードに戻す処理
+    function cancelEdit() {
+      editingTaskId = null;
+
+      // フォームをリセットし、日付は本日に戻す
+      document.getElementById("scheduleForm").reset();
+      document.getElementById("dateInput").value = getTodayFormatted();
+
+      // フォームの見た目を「新規追加モード」に戻す
+      document.getElementById("formTitleText").textContent = "新しいスケジュールを追加";
+      document.getElementById("formTitleIcon").className = "fa-solid fa-calendar-plus";
+      document.getElementById("submitBtnIcon").className = "fa-solid fa-plus";
+      document.getElementById("submitBtnText").textContent = "スケジュールを追加";
+      document.getElementById("cancelEditBtn").classList.add("hidden");
+    }
+
+    // 個別予定の削除リクエスト（モーダルを表示）
+    function requestDeleteTask(id) {
+      modalActionType = 'delete_single';
+      deleteTargetId = id;
+
+      showModal({
+        title: "予定の削除",
+        message: "この予定を削除してもよろしいですか？",
+        confirmText: "削除する",
+        isDanger: true
+      });
+    }
+
+    // 過去の終了した予定の一括削除リクエスト（モーダルを表示）
+    function requestDeletePastTasks() {
+      const todayStr = getTodayFormatted();
+      const pastCount = tasks.filter(t => t.date < todayStr).length;
+
+      // 削除対象が存在しない場合
+      if (pastCount === 0) {
+        showModal({
+          title: "終了した予定はありません",
+          message: "削除対象となる過去の日付の予定はありませんでした。",
+          confirmText: "確認",
+          isDanger: false,
+          hideCancel: true
+        });
+        return;
+      }
+
+      modalActionType = 'delete_past';
+      showModal({
+        title: "終了した予定を一括削除",
+        message: `本日より前の終了した予定（計 ${pastCount} 件）を一括削除しますか？`,
+        confirmText: `${pastCount} 件を削除`,
+        isDanger: true
+      });
+    }
+
+    // カスタムモーダル（ダイアログ）の表示関数
+    function showModal({ title, message, confirmText, isDanger, hideCancel }) {
+      const modal = document.getElementById("customModal");
+      const card = document.getElementById("modalCard");
+      
+      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalMessage").textContent = message;
+      
+      const confirmBtn = document.getElementById("modalConfirmBtn");
+      confirmBtn.textContent = confirmText;
+
+      // ボタンのスタイル設定（危険な操作かどうかで色を変更）
+      confirmBtn.className = isDanger
+        ? "flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl shadow-md transition-colors"
+        : "flex-1 py-2.5 px-4 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-xl shadow-md transition-colors";
+
+      // モーダルの表示アニメーション
+      modal.classList.remove("hidden");
+      setTimeout(() => {
+        modal.classList.remove("opacity-0");
+        card.classList.remove("scale-95");
+        card.classList.add("scale-100");
+      }, 10);
+
+      // 実行ボタンクリック時の処理割り当て
+      confirmBtn.onclick = () => {
+        if (modalActionType === 'delete_single') {
+          executeDeleteSingle();
+        } else if (modalActionType === 'delete_past') {
+          executeDeletePast();
+        } else {
+          closeModal();
+        }
+      };
+    }
+
+    // モーダルを閉じる関数
+    function closeModal() {
+      const modal = document.getElementById("customModal");
+      const card = document.getElementById("modalCard");
+
+      modal.classList.add("opacity-0");
+      card.classList.remove("scale-100");
+      card.classList.add("scale-95");
+
+      setTimeout(() => {
+        modal.classList.add("hidden");
+        deleteTargetId = null;
+        modalActionType = null;
+      }, 200);
+    }
+
+    // 単一タスクの削除実行関数
+    function executeDeleteSingle() {
+      if (!deleteTargetId) return;
+
+      if (isFirebaseConnected && db) {
+        db.ref("tasks/" + deleteTargetId).remove();
+      } else {
+        tasks = tasks.filter(t => t.id !== deleteTargetId);
+        saveTasksToStorage();
+        renderSchedule();
+      }
+      closeModal();
+    }
+
+    // 過去タスクの一括削除実行関数
+    function executeDeletePast() {
+      const todayStr = getTodayFormatted();
+
+      if (isFirebaseConnected && db) {
+        tasks.forEach(task => {
+          if (task.date < todayStr) db.ref("tasks/" + task.id).remove();
+        });
+      } else {
+        tasks = tasks.filter(t => t.date >= todayStr);
+        saveTasksToStorage();
+        renderSchedule();
+      }
+      closeModal();
+    }
+
+    // メイン描画関数（リストやカウント表示の更新）
+    function renderSchedule() {
+      const upcomingTaskList = document.getElementById("upcomingTaskList");
+      const pastTaskList = document.getElementById("pastTaskList");
+      const filterType = document.getElementById("filterType").value;
+      const todayStr = getTodayFormatted();
+
+      // フィルター条件（先生・種別）に基づく絞り込み処理
+      let filtered = tasks.filter(task => {
+        const matchTeacher = selectedTeachers.includes("ALL") || selectedTeachers.includes(task.teacher);
+        const matchType = (filterType === "ALL" || task.type === filterType);
+        return matchTeacher && matchType;
+      });
+
+      // 現在日時
+      const now = new Date();
+
+      // 予定の「終了時間」または「開始時間」を含めた現在日時との比較関数
+      const isTaskPast = (task) => {
+        // 時間指定がない場合は、その日の23:59:59を基準にする
+        const targetTime = task.endTime || task.time || '23:59';
+        const taskDateTime = new Date(`${task.date}T${targetTime}`);
+        return taskDateTime < now;
+      };
+
+      // 予定を「今後の予定」と「終了した予定」に分割
+      const upcomingTasks = filtered.filter(t => !isTaskPast(t));
+      const pastTasks = filtered.filter(t => isTaskPast(t));
+
+      // 日時順にソート（今後の予定は昇順、過去の予定は降順）
+      upcomingTasks.sort((a, b) => new Date(a.date + 'T' + (a.time || '00:00')) - new Date(b.date + 'T' + (b.time || '00:00')));
+      pastTasks.sort((a, b) => new Date(b.date + 'T' + (b.time || '00:00')) - new Date(a.date + 'T' + (a.time || '00:00')));
+
+      // ヘッダーの統計カウンター更新
+      document.getElementById("statTotalCount").textContent = tasks.length;
+      document.getElementById("statTodayCount").textContent = tasks.filter(t => t.date === todayStr).length;
+      document.getElementById("statPastCount").textContent = tasks.filter(t => t.date < todayStr).length;
+
+      // 件数表示の更新
+      document.getElementById("upcomingCountText").textContent = `${upcomingTasks.length} 件`;
+      document.getElementById("pastCountText").textContent = `${pastTasks.length} 件`;
+
+      // リスト要素の初期化
+      upcomingTaskList.innerHTML = "";
+      pastTaskList.innerHTML = "";
+
+      // 該当する予定がない場合の空状態（Empty State）表示
+      if (upcomingTasks.length === 0) {
+        upcomingTaskList.innerHTML = `
+          <div class="bg-slate-700/30 border border-dashed border-slate-600 rounded-2xl p-6 text-center text-slate-400">
+            <p class="text-xs font-medium">予定されている最新のスケジュールはありません</p>
+          </div>`;
+      }
+
+      if (pastTasks.length === 0) {
+        pastTaskList.innerHTML = `
+          <div class="p-4 text-center text-xs text-slate-500">
+            終了した予定はありません
+          </div>`;
+      }
+
+      // 個々の予定カード HTML 要素を生成する関数
+      const createCard = (task, isPast) => {
+        const isToday = task.date === todayStr;
+        const li = document.createElement("li");
+        li.className = `type-card-${task.type} ${isPast ? 'past-task' : 'bg-slate-700/50'} border-y border-r border-slate-700/60 border-l-4 rounded-xl p-3.5 sm:p-4 shadow-sm transition-all flex items-start sm:items-center justify-between gap-3`;
+
+        // 時間表示の生成
+        let timeDisplay = '';
+        if (task.time && task.endTime) {
+          timeDisplay = `<span class="font-semibold text-slate-300 ml-1"><i class="fa-regular fa-clock text-cyan-400 mr-1"></i>${escapeHtml(task.time)} 〜 ${escapeHtml(task.endTime)}</span>`;
+        } else if (task.time) {
+          timeDisplay = `<span class="font-semibold text-slate-300 ml-1"><i class="fa-regular fa-clock text-cyan-400 mr-1"></i>${escapeHtml(task.time)} 〜</span>`;
+        } else if (task.endTime) {
+          timeDisplay = `<span class="font-semibold text-slate-300 ml-1"><i class="fa-regular fa-clock text-cyan-400 mr-1"></i>〜 ${escapeHtml(task.endTime)}</span>`;
+        }
+
+        // 種別バッジのスタイルマップ
+        const badgeStyles = {
+          '会議': 'bg-red-500/10 text-red-300 border-red-500/30',
+          '行事': 'bg-amber-500/10 text-amber-300 border-amber-500/30',
+          '部活': 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+          'その他': 'bg-slate-600/20 text-slate-300 border-slate-500/30'
+        };
+
+        // 種別アイコンのマップ
+        const typeIcons = {
+          '会議': 'fa-users', '行事': 'fa-flag', '部活': 'fa-football', 'その他': 'fa-thumbtack'
+        };
+
+        const badgeStyle = badgeStyles[task.type] || badgeStyles['その他'];
+        const iconClass = typeIcons[task.type] || 'fa-bookmark';
+
+        // 本日／終了 バッジの生成
+        let dateStatusBadge = '';
+        if (isToday) {
+          dateStatusBadge = `<span class="bg-amber-400 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm animate-pulse">本日</span>`;
+        } else if (isPast) {
+          dateStatusBadge = `<span class="bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full">終了</span>`;
+        }
+
+        // カード内部のHTML構造構築
+        li.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1.5">
+              ${dateStatusBadge}
+              <span class="inline-flex items-center gap-1 bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                <i class="fa-solid fa-user-tie text-[10px]"></i> ${escapeHtml(task.teacher)}
+              </span>
+              <span class="inline-flex items-center gap-1 ${badgeStyle} border text-[11px] font-bold px-2 py-0.5 rounded-md">
+                <i class="fa-solid ${iconClass} text-[10px]"></i> ${escapeHtml(task.type)}
+              </span>
+            </div>
+            <div class="text-sm font-bold ${isPast ? 'text-slate-400' : 'text-slate-100'} break-words whitespace-pre-wrap leading-relaxed mt-3.5">${escapeHtml(task.text.trim())}</div>
+
+            <div class="text-xs text-slate-400 flex items-center gap-2 mt-3.5">
+              <span><i class="fa-regular fa-calendar text-slate-500 mr-1"></i>${escapeHtml(task.date)}</span>
+              ${timeDisplay}
+            </div>
+          </div>
+
+          <div class="self-center flex items-center gap-1">
+            <button onclick="startEditTask('${task.id}')" title="この予定を編集" class="p-2 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-colors flex items-center justify-center">
+              <i class="fa-regular fa-pen-to-square text-base"></i>
+            </button>
+            <button onclick="requestDeleteTask('${task.id}')" title="この予定を削除" class="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors flex items-center justify-center">
+              <i class="fa-regular fa-trash-can text-base"></i>
+            </button>
+          </div>
+        `;
+        return li;
+      };
+
+      // 生成したカードを画面上の各リストに追加
+      upcomingTasks.forEach(task => upcomingTaskList.appendChild(createCard(task, false)));
+      pastTasks.forEach(task => pastTaskList.appendChild(createCard(task, true)));
+    }
+
+    // XSS（クロスサイトスクリプティング）対策用のエスケープ処理関数
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
+    }
+  </script>
+</body>
+</html>
